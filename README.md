@@ -108,3 +108,4 @@ If you like my work and want to support me, you can [buy me coffee](https://www.
 ## Advanced topics and configuration
 
 see [Advanced topics](docs/advanced.md)
+# wifi_scan
