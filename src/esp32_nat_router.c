@@ -1,3 +1,4 @@
+\
 /* Console example
 
    This example code is in the Public Domain (or CC0 licensed, at your option.)
@@ -11,7 +12,6 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_console.h"
-#include "driver/uart_vfs.h"
 #include "driver/uart.h"
 #include "linenoise/linenoise.h"
 #include "argtable3/argtable3.h"
@@ -20,11 +20,10 @@
 #include "nvs_flash.h"
 #include "esp_eap_client.h"
 #include "esp_event.h"
-
+#include "esp_vfs_dev.h"
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "dhcpserver/dhcpserver.h"
-
 // #include "lwip/opt.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -228,65 +227,27 @@ esp_err_t del_portmap(u8_t proto, u16_t mport, u32_t daddr, u16_t dport)
 
 static void initialize_console(void)
 {
-    /* Drain stdout before reconfiguring it */
-    fflush(stdout);
-    fsync(fileno(stdout));
-
-    /* Disable buffering on stdin */
-    setvbuf(stdin, NULL, _IONBF, 0);
-
-#if CONFIG_CONSOLE_UART_NUM == 0
-    /* Minicom, screen, idf_monitor send CR when ENTER key is pressed */
-    uart_vfs_dev_port_set_rx_line_endings(0, ESP_LINE_ENDINGS_CR);
-    /* Move the caret to the beginning of the next line on '\n' */
-    uart_vfs_dev_port_set_tx_line_endings(0, ESP_LINE_ENDINGS_CRLF);
-
-    /* Configure UART. Note that REF_TICK is used so that the baud rate remains
-     * correct while APB frequency is changing in light sleep mode.
-     */
-    const uart_config_t uart_config = {.baud_rate = CONFIG_ESP_CONSOLE_UART_BAUDRATE,
-                                       .data_bits = UART_DATA_8_BITS,
-                                       .parity = UART_PARITY_DISABLE,
-                                       .stop_bits = UART_STOP_BITS_1,
-#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S2
-                                       .source_clk = UART_SCLK_REF_TICK,
-#else
-                                       .source_clk = UART_SCLK_XTAL,
-#endif
+    const uart_config_t uart_config = {
+        .baud_rate = CONFIG_ESP_CONSOLE_UART_BAUDRATE,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
     };
 
-    /* Install UART driver for interrupt-driven reads and writes */
-    ESP_ERROR_CHECK(uart_driver_install(CONFIG_ESP_CONSOLE_UART_NUM,
-                                        256, 0, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_driver_install(CONFIG_ESP_CONSOLE_UART_NUM, 256, 0, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(CONFIG_ESP_CONSOLE_UART_NUM, &uart_config));
 
-    /* Tell VFS to use UART driver */
-    uart_vfs_dev_use_driver(CONFIG_ESP_CONSOLE_UART_NUM);
-#else
-    ESP_LOGI(TAG, "UART console is disabled. ");
-#endif
+    // ✔ Set UART pins to default (no HW control)
+    ESP_ERROR_CHECK(uart_set_pin(CONFIG_ESP_CONSOLE_UART_NUM,
+                                 UART_PIN_NO_CHANGE,
+                                 UART_PIN_NO_CHANGE,
+                                 UART_PIN_NO_CHANGE,
+                                 UART_PIN_NO_CHANGE));
 
-    /* Initialize the console */
-    esp_console_config_t console_config = {.max_cmdline_args = 8,
-                                           .max_cmdline_length = 256,
-#if CONFIG_LOG_COLORS
-                                           .hint_color = atoi(LOG_COLOR_CYAN)
-#endif
-    };
-    ESP_ERROR_CHECK(esp_console_init(&console_config));
-
-    /* Configure linenoise line completion library */
-    /* Enable multiline editing. If not set, long commands will scroll within
-     * single line.
-     */
-    linenoiseSetMultiLine(1);
-
-    /* Tell linenoise where to get command completions and hints */
-    linenoiseSetCompletionCallback(&esp_console_get_completion);
-    linenoiseSetHintsCallback((linenoiseHintsCallback *)&esp_console_get_hint);
-
-    /* Set command history size */
-    linenoiseHistorySetMaxLen(100);
+    // ✔ New ESP-IDF 5.x API
+    esp_vfs_dev_uart_use_driver(CONFIG_ESP_CONSOLE_UART_NUM);
 }
 
 void *led_status_thread(void *p)
