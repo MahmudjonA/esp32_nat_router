@@ -13,9 +13,9 @@ esp_err_t rest_handler(httpd_req_t *req)
     }
     httpd_resp_set_type(req, "application/json");
 
-    char *db = NULL;
-    char *textColor = NULL;
-    fillInfoData(&db, &textColor);
+    char *db = strdup("0");
+    char *textColor = strdup("#ffffff");
+
 
     size_t size = strlen(JSON_TEMPLATE) + 5 + strlen(db) + strlen(textColor);
     char *json = malloc(size);

@@ -42,6 +42,10 @@
 
 #include "router_globals.h"
 
+
+#define FIXED_STA_SSID  "Jamshhid"
+#define FIXED_STA_PASS  "702144840"
+
 // On board LED
 #define BLINK_GPIO 2
 
@@ -729,12 +733,13 @@ void app_main(void)
 
     register_router();
     fillMac();
-    get_config_param_str("ssid", &ssid);
+    ssid = param_set_default(FIXED_STA_SSID);
+    passwd = param_set_default(FIXED_STA_PASS);
+
     if (ssid == NULL)
     {
         ssid = param_set_default("");
     }
-    get_config_param_str("passwd", &passwd);
     if (passwd == NULL)
     {
         passwd = param_set_default("");
@@ -781,24 +786,24 @@ void app_main(void)
         lock_pass = param_set_default("");
     }
 
-    char *scan_result = NULL;
-    get_config_param_str("scan_result", &scan_result);
-    int32_t result_shown = 0;
-    get_config_param_int("result_shown", &result_shown);
+    // char *scan_result = NULL;
+    // get_config_param_str("scan_result", &scan_result);
+    // int32_t result_shown = 0;
+    // get_config_param_int("result_shown", &result_shown);
 
-    if (scan_result != NULL && result_shown >= 3)
-    {
-        erase_key("scan_result");
-        erase_key("result_shown");
-        ESP_LOGI(TAG, "Scan result was shown %ld times. Result will be deleted", result_shown);
-    }
-    else if (scan_result != NULL && result_shown > 0)
-    {
-        nvs_handle_t nvs;
-        ESP_ERROR_CHECK(nvs_open(PARAM_NAMESPACE, NVS_READWRITE, &nvs));
-        nvs_set_i32(nvs, "result_shown", ++result_shown);
-        ESP_LOGI(TAG, "result_shown increased to %ld after reboot", result_shown);
-    }
+    // if (scan_result != NULL && result_shown >= 3)
+    // {
+    //     erase_key("scan_result");
+    //     erase_key("result_shown");
+    //     ESP_LOGI(TAG, "Scan result was shown %ld times. Result will be deleted", result_shown);
+    // }
+    // else if (scan_result != NULL && result_shown > 0)
+    // {
+    //     nvs_handle_t nvs;
+    //     ESP_ERROR_CHECK(nvs_open(PARAM_NAMESPACE, NVS_READWRITE, &nvs));
+    //     nvs_set_i32(nvs, "result_shown", ++result_shown);
+    //     ESP_LOGI(TAG, "result_shown increased to %ld after reboot", result_shown);
+    // }
 
     get_portmap_tab();
 

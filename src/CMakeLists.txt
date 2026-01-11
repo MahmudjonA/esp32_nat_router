@@ -1,13 +1,19 @@
-FILE(GLOB_RECURSE app_sources ${CMAKE_SOURCE_DIR}/src/*.*)
+FILE(GLOB_RECURSE app_sources
+    ${CMAKE_SOURCE_DIR}/src/*.c
+)
+
+list(FILTER app_sources EXCLUDE REGEX "scan.c")
+list(FILTER app_sources EXCLUDE REGEX "scanhandler.c")
 
 idf_component_register(SRCS ${app_sources} INCLUDE_DIRS ".")
+
 
 target_add_binary_data(${COMPONENT_TARGET} "pages/favicon.ico" BINARY)
 target_add_binary_data(${COMPONENT_TARGET} "pages/styles-67aa3b0203355627b525be2ea57be7bf.css" TEXT)
 target_add_binary_data(${COMPONENT_TARGET} "pages/config.html" TEXT)
 target_add_binary_data(${COMPONENT_TARGET} "pages/result.html" TEXT)
 target_add_binary_data(${COMPONENT_TARGET} "pages/apply.html" TEXT)
-target_add_binary_data(${COMPONENT_TARGET} "pages/scan.html" TEXT)
+# target_add_binary_data(${COMPONENT_TARGET} "pages/scan.html" TEXT)
 target_add_binary_data(${COMPONENT_TARGET} "pages/reset.html" TEXT)
 target_add_binary_data(${COMPONENT_TARGET} "pages/unlock.html" TEXT)
 target_add_binary_data(${COMPONENT_TARGET} "pages/advanced.html" TEXT)
