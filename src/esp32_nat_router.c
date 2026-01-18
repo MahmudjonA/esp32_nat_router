@@ -34,6 +34,9 @@
 #include "lwip/dns.h"
 #include "esp_mac.h"
 #include <esp_netif.h>
+#include "mac_filter.h"
+#include "tg_bot.h"
+#include "telegram_task.h"
 
 #if !IP_NAPT
 #error "IP_NAPT must be defined"
@@ -63,6 +66,8 @@ static EventGroupHandle_t wifi_event_group;
 /* The event group allows multiple bits for each event, but we only care about one event
  * - are we connected to the AP with an IP? */
 const int WIFI_CONNECTED_BIT = BIT0;
+
+static bool tg_started = false;
 
 bool ap_connect = false;
 
@@ -423,6 +428,20 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "Got IP: http://" IPSTR, IP2STR(&event->ip_info.ip));
+        // tg_bot_start();
+        if (!tg_started) {
+        tg_started = true;
+
+        xTaskCreate(
+            telegram_task,
+            "telegram_task",
+            10240,   // 🔴 ОБЯЗАТЕЛЬНО большой стек
+            NULL,
+            5,
+            NULL
+        );
+        
+    }
         stop_dns_server();
         ap_connect = true;
         my_ip = event->ip_info.ip.addr;
@@ -439,7 +458,16 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED)
     {
-        ESP_LOGI(TAG, "Station connected");
+
+        wifi_event_ap_staconnected_t *e = event_data;
+
+        if (!mac_allowed(e->mac)) {
+            tg_notify("🚫 BLOCKED MAC");
+            esp_wifi_deauth_sta(e->aid);
+        } else {
+            tg_notify("✅ ALLOWED MAC");
+        }
+
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED)
     {
@@ -719,6 +747,7 @@ static void setLogLevel(void)
 void app_main(void)
 {
     initialize_nvs();
+    mac_filter_init();
     register_nvs();
     if (checkForResetPinAndReset())
     {

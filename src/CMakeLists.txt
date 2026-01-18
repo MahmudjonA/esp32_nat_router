@@ -5,7 +5,12 @@ FILE(GLOB_RECURSE app_sources
 list(FILTER app_sources EXCLUDE REGEX "scan.c")
 list(FILTER app_sources EXCLUDE REGEX "scanhandler.c")
 
-idf_component_register(SRCS ${app_sources} INCLUDE_DIRS ".")
+idf_component_register(
+    SRCS ${app_sources}
+    INCLUDE_DIRS "."
+    REQUIRES tg_control
+)
+
 
 
 target_add_binary_data(${COMPONENT_TARGET} "pages/favicon.ico" BINARY)

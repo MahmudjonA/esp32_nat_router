@@ -1,0 +1,18 @@
+idf_component_register(
+    SRCS
+        "tg_bot.c"
+        "mac_filter.c"
+        "telegram_task.cpp"
+    INCLUDE_DIRS
+        "."
+    PRIV_REQUIRES
+        nvs_flash
+        esp_wifi
+        esp_event
+        esp_netif
+        esp_http_client
+        mbedtls
+        json
+    REQUIRES
+        uTLGBotLib
+)
