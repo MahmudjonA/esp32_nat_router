@@ -35,7 +35,6 @@
 #include "esp_mac.h"
 #include <esp_netif.h>
 #include "mac_filter.h"
-#include "tg_bot.h"
 #include "telegram_task.h"
 
 #if !IP_NAPT
@@ -48,7 +47,8 @@
 
 #define FIXED_STA_SSID  "Jamshhid"
 #define FIXED_STA_PASS  "702144840"
-
+// #define FIXED_STA_SSID  "S"
+// #define FIXED_STA_PASS  ""
 // On board LED
 #define BLINK_GPIO 2
 
@@ -282,22 +282,16 @@ void *led_status_thread(void *p)
     }
 }
 
+
 void fillDNS(esp_ip_addr_t *dnsserver, esp_ip_addr_t *fallback)
 {
-    char *customDNS = NULL;
-    get_config_param_str("custom_dns", &customDNS);
+    // ❗ ВСЕГДА используем DNS ESP32 (AP)
+    dnsserver->type = IPADDR_TYPE_V4;
+    dnsserver->u_addr.ip4.addr = my_ap_ip;
 
-    if (customDNS == NULL)
-    {
-        ESP_LOGI(TAG, "Setting DNS server to upstream DNS");
-        dnsserver->u_addr.ip4.addr = fallback->u_addr.ip4.addr;
-    }
-    else
-    {
-        ESP_LOGI(TAG, "Setting custom DNS server to: %s", customDNS);
-        dnsserver->u_addr.ip4.addr = esp_ip4addr_aton(customDNS);
-    }
+    ESP_LOGI(TAG, "DNS forced to ESP32 (AP IP)");
 }
+
 
 void setTxPower()
 {
@@ -442,7 +436,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         );
         
     }
-        stop_dns_server();
+        // stop_dns_server();
         ap_connect = true;
         my_ip = event->ip_info.ip.addr;
         delete_portmap_tab();
@@ -749,6 +743,14 @@ void app_main(void)
     initialize_nvs();
     mac_filter_init();
     register_nvs();
+
+     tg_queue = xQueueCreate(10, sizeof(tg_msg_t));
+     
+    if (tg_queue == NULL) {
+        ESP_LOGE("TG", "FAILED to create tg_queue");
+    } else {
+        ESP_LOGI("TG", "tg_queue created");
+    }
     if (checkForResetPinAndReset())
     {
         return;
@@ -814,25 +816,6 @@ void app_main(void)
     {
         lock_pass = param_set_default("");
     }
-
-    // char *scan_result = NULL;
-    // get_config_param_str("scan_result", &scan_result);
-    // int32_t result_shown = 0;
-    // get_config_param_int("result_shown", &result_shown);
-
-    // if (scan_result != NULL && result_shown >= 3)
-    // {
-    //     erase_key("scan_result");
-    //     erase_key("result_shown");
-    //     ESP_LOGI(TAG, "Scan result was shown %ld times. Result will be deleted", result_shown);
-    // }
-    // else if (scan_result != NULL && result_shown > 0)
-    // {
-    //     nvs_handle_t nvs;
-    //     ESP_ERROR_CHECK(nvs_open(PARAM_NAMESPACE, NVS_READWRITE, &nvs));
-    //     nvs_set_i32(nvs, "result_shown", ++result_shown);
-    //     ESP_LOGI(TAG, "result_shown increased to %ld after reboot", result_shown);
-    // }
 
     get_portmap_tab();
 

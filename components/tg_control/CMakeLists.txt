@@ -1,8 +1,9 @@
 idf_component_register(
     SRCS
-        "tg_bot.c"
+        # "tg_bot.c"
         "mac_filter.c"
         "telegram_task.cpp"
+        "blacklist.c"
     INCLUDE_DIRS
         "."
     PRIV_REQUIRES
