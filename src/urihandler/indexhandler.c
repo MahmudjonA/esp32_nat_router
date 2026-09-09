@@ -45,7 +45,7 @@ esp_err_t index_get_handler(httpd_req_t *req)
     if (lock_pass && strlen(lock_pass) > 0)
     {
         displayLockButton   = "none";
-        displayRelockButton = "flex";
+        displayRelockButton = "block";
     }
     else
     {

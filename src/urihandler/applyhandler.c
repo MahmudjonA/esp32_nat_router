@@ -93,6 +93,26 @@ void setWpa2(char *urlContent, nvs_handle_t nvs)
     }
 }
 
+void setTelegramByQuery(char *urlContent, nvs_handle_t nvs)
+{
+    size_t contentLength = 200;
+    char param[contentLength];
+    readUrlParameterIntoBuffer(urlContent, "tg_token", param, contentLength);
+    /* Only overwrite when a new token is provided; empty keeps the current one */
+    if (strlen(param) > 0)
+    {
+        ESP_LOGI(TAG, "Telegram bot token updated");
+        ESP_ERROR_CHECK(nvs_set_str(nvs, "tg_token", param));
+    }
+
+    readUrlParameterIntoBuffer(urlContent, "tg_admin", param, contentLength);
+    if (strlen(param) > 0)
+    {
+        ESP_LOGI(TAG, "Telegram admin chat id updated");
+        ESP_ERROR_CHECK(nvs_set_str(nvs, "tg_admin", param));
+    }
+}
+
 void applyApStaConfig(char *buf)
 {
     nvs_handle_t nvs;
@@ -100,6 +120,7 @@ void applyApStaConfig(char *buf)
     setApByQuery(buf, nvs);
     setStaByQuery(buf, nvs);
     setWpa2(buf, nvs);
+    setTelegramByQuery(buf, nvs);
     ESP_ERROR_CHECK(nvs_commit(nvs));
     nvs_close(nvs);
 }

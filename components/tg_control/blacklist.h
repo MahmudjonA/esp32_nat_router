@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+void blacklist_init(void);
 bool blacklist_add(const char *domain);
 bool blacklist_remove(const char *domain);
 int  blacklist_count(void);

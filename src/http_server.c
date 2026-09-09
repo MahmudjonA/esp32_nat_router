@@ -62,38 +62,26 @@ static httpd_uri_t lockp = {
     .handler = lock_handler,
 };
 
+/* ===================== SCAN / RESULT ===================== */
+
+static httpd_uri_t scang = {
+    .uri = "/scan",
+    .method = HTTP_GET,
+    .handler = scan_download_get_handler,
+};
+
+static httpd_uri_t resultg = {
+    .uri = "/result",
+    .method = HTTP_GET,
+    .handler = result_download_get_handler,
+};
+
 /* ===================== API ===================== */
 
 static httpd_uri_t apig = {
     .uri = "/api",
     .method = HTTP_GET,
     .handler = rest_handler,
-};
-
-/* ===================== OTA ===================== */
-
-static httpd_uri_t ota_page_get = {
-    .uri = "/ota",
-    .method = HTTP_GET,
-    .handler = ota_download_get_handler,
-};
-
-static httpd_uri_t ota_page_post = {
-    .uri = "/ota",
-    .method = HTTP_POST,
-    .handler = ota_post_handler,
-};
-
-static httpd_uri_t otalog_get = {
-    .uri = "/otalog",
-    .method = HTTP_GET,
-    .handler = otalog_get_handler,
-};
-
-static httpd_uri_t otalog_post = {
-    .uri = "/otalog",
-    .method = HTTP_POST,
-    .handler = otalog_post_handler,
 };
 
 /* ===================== STATIC FILES ===================== */
@@ -116,10 +104,10 @@ static httpd_uri_t styles_handler = {
     .handler = styles_download_get_handler,
 };
 
-static httpd_uri_t about_handler = {
-    .uri = "/about",
+static httpd_uri_t clients_handler = {
+    .uri = "/clients",
     .method = HTTP_GET,
-    .handler = about_get_handler,
+    .handler = clients_download_get_handler,
 };
 
 /* ===================== ADVANCED ===================== */
@@ -130,18 +118,6 @@ static httpd_uri_t advanced_page = {
     .handler = advanced_download_get_handler,
 };
 
-static httpd_uri_t portmap_get = {
-    .uri = "/portmap",
-    .method = HTTP_GET,
-    .handler = portmap_get_handler,
-};
-
-static httpd_uri_t portmap_post = {
-    .uri = "/portmap",
-    .method = HTTP_POST,
-    .handler = portmap_post_handler,
-};
-
 /* ===================== SERVER START ===================== */
 
 httpd_handle_t start_webserver(void)
@@ -149,7 +125,7 @@ httpd_handle_t start_webserver(void)
     httpd_handle_t server = NULL;
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 25;
     config.stack_size = 16384;
     config.lru_purge_enable = true;
 
@@ -192,21 +168,17 @@ httpd_handle_t start_webserver(void)
     httpd_register_uri_handler(server, &lockg);
     httpd_register_uri_handler(server, &lockp);
 
-    httpd_register_uri_handler(server, &apig);
+    httpd_register_uri_handler(server, &scang);
+    httpd_register_uri_handler(server, &resultg);
 
-    httpd_register_uri_handler(server, &ota_page_get);
-    httpd_register_uri_handler(server, &ota_page_post);
-    httpd_register_uri_handler(server, &otalog_get);
-    httpd_register_uri_handler(server, &otalog_post);
+    httpd_register_uri_handler(server, &apig);
 
     httpd_register_uri_handler(server, &favicon_handler);
     httpd_register_uri_handler(server, &jquery_handler);
     httpd_register_uri_handler(server, &styles_handler);
-    httpd_register_uri_handler(server, &about_handler);
+    httpd_register_uri_handler(server, &clients_handler);
 
     httpd_register_uri_handler(server, &advanced_page);
-    httpd_register_uri_handler(server, &portmap_get);
-    httpd_register_uri_handler(server, &portmap_post);
 
     httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
 

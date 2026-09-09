@@ -112,3 +112,39 @@ int mac_count_get(void)
 {
     return mac_count;
 }
+
+const char *mac_vendor(const uint8_t mac[6])
+{
+    /* Locally-administered bit -> the device is using a randomized/private MAC */
+    if (mac[0] & 0x02)
+        return "Private/Random";
+
+    static const struct { uint8_t o[3]; const char *name; } oui[] = {
+        {{0xAC, 0xDE, 0x48}, "Apple"},
+        {{0xF0, 0x18, 0x98}, "Apple"},
+        {{0xA4, 0x83, 0xE7}, "Apple"},
+        {{0x00, 0x1B, 0x63}, "Apple"},
+        {{0x18, 0x59, 0x36}, "Samsung"},
+        {{0x8C, 0x77, 0x12}, "Samsung"},
+        {{0x00, 0x12, 0x47}, "Samsung"},
+        {{0x50, 0x8F, 0x4C}, "Xiaomi"},
+        {{0x28, 0x6C, 0x07}, "Xiaomi"},
+        {{0x00, 0x9E, 0xC8}, "Xiaomi"},
+        {{0x24, 0x18, 0x1D}, "Huawei"},
+        {{0x00, 0x1A, 0x11}, "Google"},
+        {{0x3C, 0x5A, 0xB4}, "Google"},
+        {{0xB8, 0x27, 0xEB}, "Raspberry Pi"},
+        {{0xDC, 0xA6, 0x32}, "Raspberry Pi"},
+        {{0x30, 0xAE, 0xA4}, "Espressif"},
+        {{0x24, 0x0A, 0xC4}, "Espressif"},
+        {{0x7C, 0x9E, 0xBD}, "Espressif"},
+        {{0x00, 0xE0, 0x4C}, "Realtek"},
+        {{0x00, 0x50, 0x56}, "VMware"},
+    };
+
+    for (size_t i = 0; i < sizeof(oui) / sizeof(oui[0]); i++) {
+        if (mac[0] == oui[i].o[0] && mac[1] == oui[i].o[1] && mac[2] == oui[i].o[2])
+            return oui[i].name;
+    }
+    return "Unknown";
+}

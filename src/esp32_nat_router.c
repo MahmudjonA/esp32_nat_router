@@ -35,6 +35,7 @@
 #include "esp_mac.h"
 #include <esp_netif.h>
 #include "mac_filter.h"
+#include "blacklist.h"
 #include "telegram_task.h"
 
 #if !IP_NAPT
@@ -45,10 +46,6 @@
 #include "router_globals.h"
 
 
-#define FIXED_STA_SSID  "Jamshhid"
-#define FIXED_STA_PASS  "702144840"
-// #define FIXED_STA_SSID  "S"
-// #define FIXED_STA_PASS  ""
 // On board LED
 #define BLINK_GPIO 2
 
@@ -70,6 +67,10 @@ const int WIFI_CONNECTED_BIT = BIT0;
 static bool tg_started = false;
 
 bool ap_connect = false;
+
+/* true while a WiFi scan is running: suppresses STA auto-reconnect so the
+   driver leaves the "connecting" state and the scan is allowed */
+bool sta_scanning = false;
 
 uint32_t my_ip;
 uint32_t my_ap_ip;
@@ -412,11 +413,13 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
-        ESP_LOGI(TAG, "disconnected - retry to connect to the STA");
         ap_connect = false;
-        esp_wifi_connect();
-        ESP_LOGI(TAG, "retry to connect to the STA");
         xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        if (!sta_scanning)
+        {
+            ESP_LOGI(TAG, "disconnected - retry to connect to the STA");
+            esp_wifi_connect();
+        }
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
@@ -454,12 +457,20 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     {
 
         wifi_event_ap_staconnected_t *e = event_data;
+        uint8_t *m = e->mac;
+        char msg[128];
 
         if (!mac_allowed(e->mac)) {
-            tg_notify("🚫 BLOCKED MAC");
+            snprintf(msg, sizeof(msg),
+                "🚫 Blocked (not whitelisted)\n📱 %s\nMAC: %02X:%02X:%02X:%02X:%02X:%02X",
+                mac_vendor(e->mac), m[0], m[1], m[2], m[3], m[4], m[5]);
+            tg_notify(msg);
             esp_wifi_deauth_sta(e->aid);
         } else {
-            tg_notify("✅ ALLOWED MAC");
+            snprintf(msg, sizeof(msg),
+                "✅ Connected\n📱 %s\nMAC: %02X:%02X:%02X:%02X:%02X:%02X",
+                mac_vendor(e->mac), m[0], m[1], m[2], m[3], m[4], m[5]);
+            tg_notify(msg);
         }
 
     }
@@ -742,6 +753,7 @@ void app_main(void)
 {
     initialize_nvs();
     mac_filter_init();
+    blacklist_init();
     register_nvs();
 
      tg_queue = xQueueCreate(10, sizeof(tg_msg_t));
@@ -764,13 +776,12 @@ void app_main(void)
 
     register_router();
     fillMac();
-    ssid = param_set_default(FIXED_STA_SSID);
-    passwd = param_set_default(FIXED_STA_PASS);
-
+    get_config_param_str("ssid", &ssid);
     if (ssid == NULL)
     {
         ssid = param_set_default("");
     }
+    get_config_param_str("passwd", &passwd);
     if (passwd == NULL)
     {
         passwd = param_set_default("");

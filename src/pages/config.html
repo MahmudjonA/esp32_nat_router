@@ -12,8 +12,8 @@
 
 <body>
     <div class="container">
-        <div class="row text-center p-3">
-            <h1>ESP32 NAT Router Config <a href="/about" class="btn btn-light float-end" title="About">?</a></h1>
+        <div class="row text-center p-3 mb-4">
+            <h1>ESP32 NAT Router Config</h1>
         </div>
 
         <form action="apply" method="POST"> <input name="func" type="hidden" value="config" />
@@ -31,8 +31,8 @@
             </div>
             <div class="form-group row mt-2"> <label class="col-3" for="ap_password">Password</label>
                 <div class="col-9">
-                    <div class="input-group"> <input class="form-control col-9" id="ap_password" maxlength="64"
-                            name="ap_password" placeholder="Password of the new network" type="password" value="%s" />
+                    <div class="input-group" style="gap: 6px;"> <input class="form-control" id="ap_password" maxlength="64"
+                            name="ap_password" placeholder="Password of the new network" type="password" value="%s" style="max-width: 85%%;" />
                         <span class="input-group-text password" style="cursor: pointer;" title="show password"><svg
                                 xmlns=http://www.w3.org/2000/svg width="16" height="16" fill="currentColor"
                                 class="bi bi-eye" viewBox="0 0 16 16">
@@ -88,8 +88,8 @@
             </span>
             <div class="form-group row mt-2"> <label class="col-3" for="password">Password</label>
                 <div class="col-9">
-                    <div class="input-group"> <input class="form-control" id="password" maxlength="64" name="password"
-                            placeholder="Password of the existing network" type="password" value="%s" /> <span
+                    <div class="input-group" style="gap: 6px;"> <input class="form-control" id="password" maxlength="64" name="password"
+                            placeholder="Password of the existing network" type="password" value="%s" style="max-width: 85%%;" /> <span
                             class="input-group-text password" style="cursor: pointer;" title="show password"><svg
                                 xmlns=http://www.w3.org/2000/svg width="16" height="16" fill="currentColor"
                                 class="bi bi-eye" viewBox="0 0 16 16">
@@ -102,43 +102,35 @@
                     </div>
                 </div> <input class="form-control" name="x" type="hidden" value="x" />
             </div>
-            <div class="form-group row col-4 offset-4 mt-4"> <input class="btn btn-primary" type="submit"
+            <h2 class="mt-4">Telegram Bot</h2>
+            <div class="form-group row mt-2"> <label class="col-3" for="tg_token">Bot Token</label>
+                <div class="col-9"> <input class="form-control" id="tg_token" maxlength="60" name="tg_token"
+                        placeholder="Paste token from @BotFather (leave empty to keep current)" type="text" /> </div>
+            </div>
+            <div class="form-group row col-9 offset-3"> <small class="form-text text-muted">Stored on the device only.
+                    Leave empty to keep the current token.</small> </div>
+            <div class="form-group row mt-2"> <label class="col-3" for="tg_admin">Admin Chat ID</label>
+                <div class="col-9"> <input class="form-control" id="tg_admin" maxlength="32" name="tg_admin"
+                        placeholder="Your Telegram chat id (leave empty to keep / auto-set)" type="text" /> </div>
+            </div>
+            <div class="form-group row col-9 offset-3"> <small class="form-text text-muted">Only this chat can control
+                    the bot. If empty, the first person who messages the bot becomes admin.</small> </div>
+
+            <div class="form-group row col-4 offset-4 mt-4 text-center"> <input class="btn btn-primary" type="submit"
                     value="Apply" /> </div>
         </form>
-        <h2 class="mt-2">Device Management</h2>
+        <h2 class="mt-5">Device Management</h2>
 
-        <div class="form-group row col-4 offset-4 mt-2">
-            <a href="scan" class="btn btn-light col-%s" title="Wifi scan">Wifi Scan</a>
-            <a href="result" class="btn btn-light col-3" type="submit" title="last result" style="display: %s;"><svg
-                    xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                    class="bi bi-clock-history" viewBox="0 0 16 16">
-                    <path
-                        d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022l-.074.997zm2.004.45a7.003 7.003 0 0 0-.985-.299l.219-.976c.383.086.76.2 1.126.342l-.36.933zm1.37.71a7.01 7.01 0 0 0-.439-.27l.493-.87a8.025 8.025 0 0 1 .979.654l-.615.789a6.996 6.996 0 0 0-.418-.302zm1.834 1.79a6.99 6.99 0 0 0-.653-.796l.724-.69c.27.285.52.59.747.91l-.818.576zm.744 1.352a7.08 7.08 0 0 0-.214-.468l.893-.45a7.976 7.976 0 0 1 .45 1.088l-.95.313a7.023 7.023 0 0 0-.179-.483zm.53 2.507a6.991 6.991 0 0 0-.1-1.025l.985-.17c.067.386.106.778.116 1.17l-1 .025zm-.131 1.538c.033-.17.06-.339.081-.51l.993.123a7.957 7.957 0 0 1-.23 1.155l-.964-.267c.046-.165.086-.332.12-.501zm-.952 2.379c.184-.29.346-.594.486-.908l.914.405c-.16.36-.345.706-.555 1.038l-.845-.535zm-.964 1.205c.122-.122.239-.248.35-.378l.758.653a8.073 8.073 0 0 1-.401.432l-.707-.707z" />
-                    <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0v1z" />
-                    <path
-                        d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5z" />
-                </svg></a>
+        <div class="device-mgmt mt-3">
+            <a href="scan" class="btn btn-light" title="Wifi scan">Wifi Scan</a>
+            <a href="result" class="btn btn-light" title="Last scan result">Last Scan Result</a>
+            <a href="lock" class="btn btn-light" style="display: %s" title="Lock interface">Lock interface</a>
+            <span style="display: %s">
+                <a href="lock" class="btn btn-light" title="Change/Remove lock pass">Change/Remove lock pass</a>
+                <a href="unlock" class="btn btn-light" title="Relock">Relock</a>
+            </span>
+            <a href="advanced" class="btn btn-warning" title="Advanced" style="margin-top: 1.8rem;">Advanced</a>
         </div>
-        <div class="form-group row col-4 offset-4 mt-2">
-            <a href="/ota" class="btn btn-light">OTA Updates</a>
-        </div>
-        <div class="form-group row col-4 offset-4 mt-2">
-            <a href="/portmap" class="btn btn-light">Portmap configuration</a>
-        </div>
-        <a href="lock" class="btn btn-light col-4 offset-4 mt-2" style="display: %s" title="Lock interface">Lock
-            interface</a>
-
-        <div class="form-group row col-4 offset-4 mt-2" style="display: %s">
-            <a href="lock" class="btn btn-light col-9" title="Change/Remove lock pass">Change/Remove lock
-                pass</a>
-            <a href="unlock" class="btn btn-light col-3" type="submit" title="Relock" style="display: block;"><svg
-                    xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-lock"
-                    viewBox="0 0 16 16">
-                    <path
-                        d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
-                </svg></a>
-        </div>
-        <a href="advanced" class="btn btn-warning col-4 offset-4 mt-5" title="Advanced">Advanced</a>
 
     </div>
     <script src="jquery-8a1045d9cbf50b52a0805c111ba08e94.js"></script>

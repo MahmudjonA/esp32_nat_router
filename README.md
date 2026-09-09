@@ -1,111 +1,167 @@
-# ESP32 NAT Router Extended
+# ESP32 NAT Router with Telegram Control & Content Filtering
 
-This is a firmware to use the ESP32 as WiFi NAT router. It can be used as
-- Simple range extender for an existing WiFi network
-- Setting up an additional WiFi network with different SSID/password for guests or IOT devices
-
-This is an extension of the great work of [martin-ger's ESP32 NAT Router-project](https://github.com/martin-ger/esp32_nat_router). I used his project as a starting point for learning microcontroller programming and extended it with some features for my use case. 
-
-## Features / Usage scenarios
-- Extend range of WiFi network (Repeater)
-- Additional network for guests
-- Portable usage with a small, low power device (battery powered)
-- [Bypass restrictions](docs/advanced.md#advanced-configuration) in public WiFis, like device and rate limit
-- Scanning for APs (s. [limitations](#wifi-scanning-limitation))
-- User friendly UI with mobile support
-- [Resetting the device](docs/advanced.md#resetting-the-device-erasing-the-flash) in UI and with Pin/Button
-- [OTA-Updates](docs/ota.md)
-- Keep connection alive on networks with forced disconnect
-- Secure frontend by password or complete disabling
-- Show connected state and quality in UI
-- Disable the on board indicator LED 
-
-## First Boot
-After first boot the ESP32 NAT Router will offer a WiFi network with an open AP and the ssid "ESP32_NAT_Router". Configuration can either be done via a simple web interface or via the serial console. 
-
-## Web Config Interface
-The web interface allows for the configuration of all parameters. Connect you PC or smartphone to the WiFi SSID "ESP32_NAT_Router" and point your browser to "http://192.168.4.1". This page should appear:
-
-![image](docs/index.png)
-
-First enter the appropriate values for the uplink WiFi network, the "STA Settings". Leave password blank for open networks. Click "Connect". The ESP32 reboots and will connect to your WiFi router.
-
-Now you can reconnect and reload the page and change the "Soft AP Settings". Click "Set" and again the ESP32 reboots. Now it is ready for forwarding traffic over the newly configured Soft AP. Be aware that these changes also affect the config interface, i.e. to do further configuration, connect to the ESP32 through one of the newly configured WiFi networks.
+Turn an **ESP32** into a WiFi **NAT router / range extender** that you control remotely from a
+**Telegram bot**. It repeats an existing WiFi network into its own access point, forwards traffic
+with NAT, and lets an admin block domains, whitelist devices, and watch connected clients — all
+from Telegram or a simple web panel.
 
 ## Screenshots
 
-![image](docs/scan.png)
-![image](docs/enterprise_wifi.png)
-![image](docs/advanced.png)
-![image](docs/portmap.png)
-![image](docs/reset.png)
-![image](docs/lock.png)
-![image](docs/ota.png)
-![image](docs/unlock.png)
-![image](docs/connected_clients.png)
+**Web configuration** (`http://192.168.4.1`)
 
+![Config](docs/screen_main.png)
 
-## Flashing the prebuild binaries
-- Download [latest release](https://github.com/dchristl/esp32_nat_router_extended/releases/latest)
-  * Download esp32nat_extended_full_vX.X.X.zip for fresh install
-  * Download esp32nat_extended_update_vX.X.X.zip for update
-- Install [esptool](https://github.com/espressif/esptool)
- 
+**Connected clients**
 
-### First install/ Reset 
+![Clients](docs/screen_clients.png)
 
-If your device was used before for other projects or you want to reset all setting from previous version. Complete data loss!
-Unpack archive first and then execute:
+**Advanced settings**
 
+![Advanced](docs/screen_advanced.png)
+
+## Features
+
+- **WiFi NAT router / repeater** – extend an existing WiFi network with its own SSID
+- **Web configuration UI** at `http://192.168.4.1` (mobile friendly, light theme)
+- **Telegram bot control**
+  - List connected clients (vendor, IP, MAC)
+  - Whitelist / block devices by MAC
+  - Block / unblock domains
+  - Get notified when a device connects or hits a blocked site
+- **DNS domain blocking** – local blocklist, persisted to flash (NVS)
+- **MAC whitelist** – restrict which devices may connect
+- **Admin protection** – only the configured Telegram chat can control the bot
+- **No secrets in the source** – the bot token is stored on the device, not in the code
+
+## Hardware
+
+- A classic **ESP32** board (e.g. `esp32dev`), 4 MB flash
+- 2.4 GHz WiFi only (ESP32 has no 5 GHz)
+- A USB cable to your computer
+
+---
+
+## 1. Install PlatformIO
+
+This project is built with **PlatformIO** (ESP-IDF framework). The easiest way is the VS Code extension:
+
+1. Install [Visual Studio Code](https://code.visualstudio.com/).
+2. Open the **Extensions** panel (`Ctrl+Shift+X`), search **"PlatformIO IDE"**, and install it.
+3. Restart VS Code. Wait for PlatformIO to finish its first-time setup (bottom status bar).
+
+*(CLI alternative: `pip install platformio`, then use the `pio` commands below.)*
+
+## 2. Get the project
+
+```bash
+git clone https://github.com/MahmudjonA/esp32_nat_router.git
+cd esp32_nat_router
 ```
-esptool.py write_flash 0x0 esp32nat_extended_full_vX.X.X.bin 
+
+Everything needed (including the Telegram library and its CA certificate) is included — no submodule setup required.
+
+## 3. Open, Build & Flash
+
+**In VS Code:**
+
+1. **File → Open Folder** and select the project folder.
+
+   ![Open project](docs/pio_open.png)
+
+2. Open the **PlatformIO** sidebar and expand **Project Tasks → esp32**.
+
+   ![PlatformIO tasks](docs/pio_start.png)
+
+3. Click **Build** to compile.
+
+   ![Build](docs/pio_compile.png)
+
+4. Connect the ESP32 over USB and click **Upload**.
+5. Click **Monitor** to see the serial log (115200 baud).
+
+**From the terminal:**
+
+```bash
+pio run                    # build
+pio run --target upload    # flash (ESP32 connected over USB)
+pio device monitor -b 115200   # serial log
 ```
 
-### Update from older version
-If this project was already installed. No data loss from previous version. The preferred way is with [OTA-Updates](docs/ota.md). If you want to do it manually:
- 
-```
-esptool.py write_flash 0x10000 esp32nat_extended_vX.X.X.bin 
-```
-### General 
+> **Build fails with `pip._internal.utils.inject_securetransport`?**
+> The ESP-IDF Python environment has a broken pip. Fix it:
+> ```bash
+> "$HOME/.platformio/penv/.espidf-5.1.2/Scripts/python.exe" -m ensurepip --upgrade
+> ```
+> or delete `~/.platformio/penv/.espidf-5.1.2` and let PlatformIO recreate it.
 
-If any problem occurs, erase flash manually before flashing the full version :
-```
-esptool.py erase_flash
-```
+---
 
+## 4. First-time Setup
 
-### Alternative way/ Graphical (Windows only)
-As an alternative you might use [Espressif's Flash Download Tools](https://www.espressif.com/en/support/download/other-tools).
+1. After flashing, the ESP32 creates an open WiFi network named **`ESP32_NAT_Router`**.
+2. Connect to it and open **`http://192.168.4.1`**.
+3. **STA Settings** – enter your existing WiFi (uplink) **SSID** and **password**.
+4. **AP Settings** *(optional)* – set your own SSID/password for the new network.
+5. **Telegram Bot** *(optional)* – paste your **Bot Token** (see below).
+6. Click **Apply**. The device reboots and connects to your uplink — NAT is now active.
 
-Check the marked parameters and files like below (ckeck the COM-Port for your environment). 
+## 5. Telegram Bot
 
-Check the addresses like below: 
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its **token**.
+2. Paste the token in the web panel (**Telegram Bot → Bot Token**) and **Apply**.
+3. Message your bot once. If no admin is set yet, **the first person to message becomes the admin**
+   (saved on the device). Only the admin can run commands.
+4. To pin the admin explicitly: message the bot — it replies with your **chat id** — then enter that
+   id under **Telegram Bot → Admin Chat ID**.
 
-### First install/ Reset 
+### Commands
 
-![image](docs/win_flash_full.png)
+| Command | Description |
+|---------|-------------|
+| `/ping` | Health check (replies `pong`) |
+| `/clients` | List connected devices (vendor, IP, MAC) |
+| `/allow AA:BB:CC:DD:EE:FF` | Add a MAC to the whitelist |
+| `/block AA:BB:CC:DD:EE:FF` | Remove a MAC from the whitelist |
+| `/list` | Number of whitelisted MACs |
+| `/clear` | Disable the whitelist (allow all) |
+| `/blockdomain example.com` | Block a domain and its subdomains |
+| `/undomain example.com` | Unblock a domain |
+| `/domains` | List blocked domains |
 
-### Update from older version
+The admin is notified when a device connects (allowed/blocked) and when a device hits a blocked
+site (rate-limited to avoid spam).
 
-![image](docs/win_flash.png)
+## 6. Web Interface
 
-## Building the Binaries
+- **AP / STA settings**, **Telegram Bot** (token + admin), **Apply**
+- **Device Management**: Wifi Scan, Last Scan Result, Lock interface, Advanced
+- **Clients**: connected devices with IP and MAC
+- **Advanced**: NAT on/off, WiFi tx power, DNS override, MAC override, netmask, hostname, LED,
+  keep-alive, and **device reset** (erase all settings)
 
-see [How to setup environment and build](docs/BUILD.md)
+## How the filters work
 
+- **MAC whitelist** – empty = everyone allowed. After the first `/allow`, whitelist mode turns on
+  and non-whitelisted devices are disconnected (the bot warns you which). Send `/clear` from
+  Telegram to turn it off and restore full access.
+- **Domain blocking** – matches the exact domain and its subdomains: blocking `example.com`
+  blocks `example.com` and `www.example.com`, but not `notexample.com`.
 
-## Wifi scanning limitation
-Due to technical limitations, a client cannot be simultaneously connected to the device and scan for Wi-Fi networks. Before the scan starts, all the clients will be disconnected. After that, the scan will be saved in NVS,and the device will reboot. Upon reconnecting to the device, you will be able to view the scanned networks.
+## Limitations
 
-An automatic redirect occurs the first time. Afterward, the scanned networks can be viewed three more times before they are deleted from the NVS to save storage space.
+- **Encrypted DNS (DoH/DoT) bypasses domain blocking.** Clients using DNS-over-HTTPS (Chrome,
+  Firefox, iOS/Android "Private DNS") don't query the router's DNS. Disable secure DNS on the
+  client for filtering to work.
+- **MAC randomization** – modern phones use random MACs by default (shown as `Private/Random`),
+  which makes vendor detection and MAC whitelisting unreliable. Disable "Private WiFi address" on
+  the client for a stable MAC.
+- **A full flash erase wipes all settings** (token, admin, WiFi, blocklists) — re-enter them after
+  `erase_flash` (not needed after a normal reflash).
+- **Scanning** briefly interrupts the AP for a few seconds.
+- Built for the classic **ESP32** (`esp32dev`) only.
 
-## Misc
+## Credits
 
-If you have any problems, suggestions for new features feel free to ask or raise an issue. This is a spare time project, I will answer if I'm free.
-If you like my work and want to support me, you can [buy me coffee](https://www.buymeacoffee.com/dchristl) or send me a donation via [PayPal](https://bit.ly/3Gde3KN)
-
-## Advanced topics and configuration
-
-see [Advanced topics](docs/advanced.md)
-# wifi_scan
+- [dchristl/esp32_nat_router_extended](https://github.com/dchristl/esp32_nat_router_extended)
+- [martin-ger/esp32_nat_router](https://github.com/martin-ger/esp32_nat_router)
+- [uTLGBotLib](https://github.com/J-Rios/uTLGBotLib) — Telegram bot library

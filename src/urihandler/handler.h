@@ -25,12 +25,12 @@ esp_err_t unlock_handler(httpd_req_t *req);
 esp_err_t lock_handler(httpd_req_t *req);
 esp_err_t redirectToLock(httpd_req_t *req);
 
-// /* ScanHandler */
-// void fillInfoData(char **db, char **textColor);
-// esp_err_t scan_download_get_handler(httpd_req_t *req);
+/* ScanHandler */
+esp_err_t scan_download_get_handler(httpd_req_t *req);
 
 /* ResultHandler */
-// esp_err_t result_download_get_handler(httpd_req_t *req);
+esp_err_t result_download_get_handler(httpd_req_t *req);
+char *findTextColorForSSID(int8_t rssi);
 
 /* ApplyHandler */
 esp_err_t apply_get_handler(httpd_req_t *req);
@@ -43,17 +43,4 @@ esp_err_t rest_handler(httpd_req_t *req);
 esp_err_t advanced_download_get_handler(httpd_req_t *req);
 
 /* clients handler*/
-// esp_err_t clients_download_get_handler(httpd_req_t *req);
-
-/* OTA */
-esp_err_t ota_download_get_handler(httpd_req_t *req);
-esp_err_t otalog_get_handler(httpd_req_t *req);
-esp_err_t ota_post_handler(httpd_req_t *req);
-esp_err_t otalog_post_handler(httpd_req_t *req);
-
-/* About-Handler */
-esp_err_t about_get_handler(httpd_req_t *req);
-
-/* Portmap -Handler*/
-esp_err_t portmap_get_handler(httpd_req_t *req);
-esp_err_t portmap_post_handler(httpd_req_t *req);
+esp_err_t clients_download_get_handler(httpd_req_t *req);

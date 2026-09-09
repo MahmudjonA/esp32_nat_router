@@ -41,6 +41,7 @@ extern "C"
 
   
    extern bool ap_connect;
+   extern bool sta_scanning;
 
    extern uint32_t my_ip;
    extern uint32_t my_ap_ip;

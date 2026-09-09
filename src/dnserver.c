@@ -21,8 +21,7 @@
 #include "esp_wifi.h"
 #include "blacklist.h"
 #include "telegram_task.h"
-#include "esp_http_client.h"
-#include "cJSON.h"
+#include "mac_filter.h"
 #include "lwip/api.h"
 
 #define DNS_PORT (53)
@@ -35,102 +34,6 @@
 
 static const char *TAG = "DNSServer";
 TaskHandle_t task = NULL;
-
-typedef struct {
-    char domain[128];
-    char mac[18];
-} backend_req_t;
-
-static QueueHandle_t backend_queue = NULL;
-
-typedef enum {
-    DECISION_UNKNOWN = 0,
-    DECISION_ALLOW,
-    DECISION_BLOCK
-} decision_t;
-
-decision_t check_domain_backend(const char *domain, const char *mac);
-
-
-typedef struct {
-    char domain[128];
-    char mac[18];
-    decision_t decision;
-    uint32_t ts;
-} decision_cache_t;
-
-#define DECISION_CACHE_SIZE 64
-static decision_cache_t decision_cache[DECISION_CACHE_SIZE];
-
-static decision_t cache_lookup(const char *domain, const char *mac)
-{
-    for (int i = 0; i < DECISION_CACHE_SIZE; i++) {
-        if (decision_cache[i].decision != DECISION_UNKNOWN &&
-            strcmp(decision_cache[i].domain, domain) == 0 &&
-            strcmp(decision_cache[i].mac, mac) == 0) {
-            return decision_cache[i].decision;
-        }
-    }
-    return DECISION_UNKNOWN;
-}
-
-static void cache_update(const char *domain, const char *mac, decision_t d)
-{
-    for (int i = 0; i < DECISION_CACHE_SIZE; i++) {
-        if (decision_cache[i].decision == DECISION_UNKNOWN) {
-            strncpy(decision_cache[i].domain, domain, sizeof(decision_cache[i].domain)-1);
-            strncpy(decision_cache[i].mac, mac, sizeof(decision_cache[i].mac)-1);
-            decision_cache[i].decision = d;
-            decision_cache[i].ts = xTaskGetTickCount();
-            return;
-        }
-    }
-
-    // overwrite oldest (просто)
-    decision_cache[0].decision = d;
-    strncpy(decision_cache[0].domain, domain, sizeof(decision_cache[0].domain)-1);
-    strncpy(decision_cache[0].mac, mac, sizeof(decision_cache[0].mac)-1);
-}
-
-
-static void backend_task(void *arg)
-{
-    backend_req_t req;
-
-    while (1)
-    {
-        if (xQueueReceive(backend_queue, &req, portMAX_DELAY))
-        {
-            ESP_LOGI("BACKEND", "Check domain: %s (%s)",
-                     req.domain, req.mac);
-
-                decision_t d = check_domain_backend(req.domain, req.mac);
-
-                cache_update(req.domain, req.mac, d);
-
-                if (d == DECISION_ALLOW)
-                {
-                    ESP_LOGI("BACKEND", "✅ ALLOW: %s", req.domain);
-                }
-                else if (d == DECISION_BLOCK)
-                {
-                    ESP_LOGW("BACKEND", "🚫 BLOCK: %s", req.domain);
-                }
-                else
-                {
-                    ESP_LOGW("BACKEND", "❓ UNKNOWN decision for: %s", req.domain);
-                }
-                {
-                    char msg[256];
-                    snprintf(msg, sizeof(msg),
-                            "🚫 BLOCKED by backend\n%s\nMAC: %s",
-                            req.domain, req.mac);
-                    tg_notify(msg);
-                }
-        }
-    }
-}
-
 
 // DNS Header Packet
 typedef struct __attribute__((__packed__))
@@ -195,55 +98,6 @@ static char *parse_dns_name(char *raw_name, char *parsed_name, size_t parsed_nam
     return label + 1;
 }
 
-decision_t check_domain_backend(const char *domain, const char *mac)
-{
-    esp_http_client_config_t config = {
-        .url = "http://192.168.4.3:8000/check",
-        .method = HTTP_METHOD_POST,
-        .timeout_ms = 3000,
-    };
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "domain", domain);
-    cJSON_AddStringToObject(root, "mac", mac);
-
-    char *post_data = cJSON_PrintUnformatted(root);
-
-    esp_http_client_set_header(client, "Content-Type", "application/json");
-    esp_http_client_set_post_field(client, post_data, strlen(post_data));
-
-    decision_t result = DECISION_ALLOW;   // default fail-open
-
-    if (esp_http_client_perform(client) == ESP_OK)
-    {
-        char buf[256] = {0};
-        int len = esp_http_client_read_response(client, buf, sizeof(buf)-1);
-
-        if (len > 0)
-        {
-            cJSON *resp = cJSON_Parse(buf);
-            if (resp)
-            {
-                cJSON *decision = cJSON_GetObjectItem(resp, "decision");
-                if (decision && decision->valuestring)
-                {
-                    if (!strcmp(decision->valuestring, "BLOCK"))
-                        result = DECISION_BLOCK;
-                }
-                cJSON_Delete(resp);
-            }
-        }
-    }
-
-    cJSON_Delete(root);
-    free(post_data);
-    esp_http_client_cleanup(client);
-
-    return result;
-}
-
 
 static uint32_t forward_dns_query(const char *domain)
 {
@@ -264,9 +118,72 @@ static uint32_t forward_dns_query(const char *domain)
     return ip_info.ip.addr;
 }
 
+/* Look up the MAC of a connected AP client by its IP (network byte order) */
+static bool mac_by_ip(uint32_t ip, uint8_t mac_out[6])
+{
+    wifi_sta_list_t wifi_list;
+    if (esp_wifi_ap_get_sta_list(&wifi_list) != ESP_OK || wifi_list.num == 0)
+        return false;
+
+    esp_netif_pair_mac_ip_t pairs[ESP_WIFI_MAX_CONN_NUM];
+    for (int i = 0; i < wifi_list.num; i++)
+        memcpy(pairs[i].mac, wifi_list.sta[i].mac, 6);
+
+    esp_netif_t *ap = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    if (esp_netif_dhcps_get_clients_by_mac(ap, wifi_list.num, pairs) != ESP_OK)
+        return false;
+
+    for (int i = 0; i < wifi_list.num; i++) {
+        if (pairs[i].ip.addr == ip) {
+            memcpy(mac_out, pairs[i].mac, 6);
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Rate-limit the "blocked site" notifications: at most one per (domain, ip)
+   per interval, so a browser retrying does not flood the admin's chat */
+#define NOTIFY_CACHE_SIZE   16
+#define NOTIFY_INTERVAL_MS  60000
+
+static struct {
+    char     domain[128];
+    uint32_t ip;
+    uint32_t last_ms;
+} notify_cache[NOTIFY_CACHE_SIZE];
+
+static bool should_notify(const char *domain, uint32_t ip)
+{
+    uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
+
+    for (int i = 0; i < NOTIFY_CACHE_SIZE; i++) {
+        if (notify_cache[i].ip == ip &&
+            strcmp(notify_cache[i].domain, domain) == 0) {
+            if ((now - notify_cache[i].last_ms) < NOTIFY_INTERVAL_MS)
+                return false;
+            notify_cache[i].last_ms = now;
+            return true;
+        }
+    }
+
+    /* new entry -> overwrite the oldest slot */
+    int oldest = 0;
+    for (int i = 1; i < NOTIFY_CACHE_SIZE; i++)
+        if (notify_cache[i].last_ms < notify_cache[oldest].last_ms)
+            oldest = i;
+
+    strncpy(notify_cache[oldest].domain, domain, sizeof(notify_cache[oldest].domain) - 1);
+    notify_cache[oldest].domain[sizeof(notify_cache[oldest].domain) - 1] = 0;
+    notify_cache[oldest].ip = ip;
+    notify_cache[oldest].last_ms = now;
+    return true;
+}
+
 // Parses the DNS request and prepares a DNS response with the IP of the softAP
 static int parse_dns_request(char *req, size_t req_len,
-                             char *dns_reply, size_t dns_reply_max_len)
+                             char *dns_reply, size_t dns_reply_max_len,
+                             uint32_t client_ip)
 {
     if (req_len > dns_reply_max_len) {
         return -1;
@@ -314,44 +231,37 @@ static int parse_dns_request(char *req, size_t req_len,
 
         ESP_LOGI(TAG, "DNS query: %s (type=%d)", name, qd_type);
 
-        // ========== ПОЛУЧАЕМ MAC КЛИЕНТА ==========
-        char mac_str[18] = "UNKNOWN";
-        wifi_sta_list_t sta_list;
-        memset(&sta_list, 0, sizeof(sta_list));
-
-        if (esp_wifi_ap_get_sta_list(&sta_list) == ESP_OK && sta_list.num > 0)
+        // ========== ПРОВЕРКА ПО ЛОКАЛЬНОМУ ЧЁРНОМУ СПИСКУ ==========
+        bool is_blocked = is_domain_blacklisted(name);
+        if (is_blocked)
         {
-            uint8_t *sta_mac = sta_list.sta[0].mac;
-            snprintf(mac_str, sizeof(mac_str),
-                    "%02X:%02X:%02X:%02X:%02X:%02X",
-                    sta_mac[0], sta_mac[1], sta_mac[2],
-                    sta_mac[3], sta_mac[4], sta_mac[5]);
+            ESP_LOGW(TAG, "Blocked domain: %s", name);
+
+            /* Notify the admin which device hit a blocked site (rate-limited) */
+            if (client_ip != 0 && should_notify(name, client_ip))
+            {
+                char ipstr[16];
+                esp_ip4_addr_t a;
+                a.addr = client_ip;
+                esp_ip4addr_ntoa(&a, ipstr, sizeof(ipstr));
+
+                uint8_t cmac[6];
+                char msg[256];
+                if (mac_by_ip(client_ip, cmac))
+                {
+                    snprintf(msg, sizeof(msg),
+                        "🚫 Blocked site accessed\n%s\n📱 %s\nIP: %s\nMAC: %02X:%02X:%02X:%02X:%02X:%02X",
+                        name, mac_vendor(cmac), ipstr,
+                        cmac[0], cmac[1], cmac[2], cmac[3], cmac[4], cmac[5]);
+                }
+                else
+                {
+                    snprintf(msg, sizeof(msg),
+                        "🚫 Blocked site accessed\n%s\nIP: %s", name, ipstr);
+                }
+                tg_notify(msg);
+            }
         }
-
-        decision_t d = cache_lookup(name, mac_str);
-
-        if (backend_queue && d == DECISION_UNKNOWN) {
-            backend_req_t breq = {0};
-            strncpy(breq.domain, name, sizeof(breq.domain)-1);
-            strncpy(breq.mac, mac_str, sizeof(breq.mac)-1);
-            xQueueSend(backend_queue, &breq, 0);
-        }
-
-
-
-             bool is_blocked =
-            (d == DECISION_BLOCK) ||
-            is_domain_blacklisted(name);
-
-
-        // if (is_blocked)
-        // {
-        //     ESP_LOGW(TAG, "🚫 BLOCKED: %s", name);
-
-        //     char msg[256];
-        //     snprintf(msg, sizeof(msg), "🚫 Blocked: %s", name);
-        //     tg_notify(msg);
-        // }
 
         // ========== ФОРМИРУЕМ ОТВЕТ ==========
         if (qd_type == QD_TYPE_A)
@@ -441,9 +351,11 @@ void dns_server_task(void *pvParameters)
             // Data received
             else
             {
-                // Get the sender's ip address as string
+                // Get the sender's ip address (as string and as raw IPv4)
+                uint32_t client_ip = 0;
                 if (source_addr.sin6_family == PF_INET)
                 {
+                    client_ip = ((struct sockaddr_in *)&source_addr)->sin_addr.s_addr;
                     inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
                 }
                 else if (source_addr.sin6_family == PF_INET6)
@@ -455,7 +367,7 @@ void dns_server_task(void *pvParameters)
                 rx_buffer[len] = 0;
 
                 char reply[DNS_MAX_LEN];
-                int reply_len = parse_dns_request(rx_buffer, len, reply, DNS_MAX_LEN);
+                int reply_len = parse_dns_request(rx_buffer, len, reply, DNS_MAX_LEN, client_ip);
 
                 ESP_LOGI(TAG, "Received %d bytes from %s | DNS reply with len: %d", len, addr_str, reply_len);
                 if (reply_len <= 0)
@@ -505,15 +417,7 @@ uint16_t getConnectCount()
 
 void start_dns_server()
 {
-    // ✅ Создаём очередь
-    if (backend_queue == NULL) {
-        backend_queue = xQueueCreate(10, sizeof(backend_req_t));
-    }
-    
-    // ✅ Запускаем backend task
-    xTaskCreate(backend_task, "backend_task", 4096, NULL, 5, NULL);
-    
-    // ✅ Запускаем DNS сервер
+    // Запускаем DNS сервер (фильтрация по локальному чёрному списку)
     xTaskCreate(dns_server_task, "dns_server", 4096, NULL, 5, &task);
     ESP_LOGI(TAG, "DNS Server started");
 }
